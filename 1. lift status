@@ -1,0 +1,27 @@
+1. lift status
+2. door contact
+3. restroom fan speed
+
+
+AECOM IBM server
+post data to server
+
+1. lift signal
+3 lifts - ON/OFF/FAULT
+=9
+
+2. Door Lora
+ON/OFF/FAULT
+30 mins
+2 gateways
+UDP packet 
+18
+
+CAR-00[1|2|3]
+CAR
+ON/OFF/FAULT
+
+3. restroom
+vpn serialt
+
+MT01
