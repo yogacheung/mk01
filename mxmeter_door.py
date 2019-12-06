@@ -25,50 +25,12 @@ def log_file(msg):
   log.write(log_msg)
   log.close()
 
-def check_fault():
-  door_name = {'2008':'DOOR-003', '2011':'DOOR-016', '2014':'DOOR-039', '2010':'DOOR-050', '2009':'DOOR-060', '2005':'DOOR-058', '2013':'DOOR-073', '2002':'DOOR-084', '2016':'DOOR-088', '2007':'DOOR-099', '2015':'DOOR-108', '2004':'DOOR-119', '2006':'DOOR-140', '2012':'DOOR-156', '2003':'DOOR-135', '2001':'DOOR-163'}
-  
-  url = 'http://137.116.160.215:9080/maximo/oslc/os/mxapiasset?_lid=mxintadm&_lpwd=mxintadm&oslc.select=assetmeter{lastreading,changedate}&oslc.where=assetnum=%22'
-  
-  now_time = strftime('%Y-%m-%d %H:%M:%S', localtime())
-  
-  for i in range(2001, 2017):
-    ret_door = requests.get(url + door_name[str(i)] + '%22')
-    res = ret_door.json()
-    #print(res)
-    res = res.get('rdfs:member')[0]
-    #print(res)
-    last_time = res.get('spi:changedate')
-    print(last_time)
-    door_status = res.get('spi:lastreading')
-    
-    diff = now_time - last_time
-    diff_mins = diff.seconds / 60
-    print(diff_mins)
-    
-    if diff_mins > 5 and door_status == 'ON':
-      door_status = 'FAULT'
-      url = 'http://137.116.160.215:9080/maxrest/rest/os/MXMETERDATA?_format=json'
-      headers = {'Content-type': 'application/json'}
-  
-      params = '&_lid=mxintadm&_lpwd=mxintadm&SITEID=MK01'
-      params += '&ASSETNUM=' + door_name[str(i)]
-      params += '&METERNAME=IOTALARM'
-      params += '&NEWREADING=FAULT'   
-    
-      data = {
-        '_lid': 'mxintadm', 
-        '_lpwd': 'mxintadm', 
-        'SITEID': 'MK01', 
-        'ASSETNUM': door_name[str(i)], 
-        'METERNAME': 'IOTALARM', 
-        'NEWREADING': 'FAULT'
-      }
-  
-      print(moduleID, door_name[str(moduleID)], 'FAULT')
-      r = requests.post(url+params, data=json.dumps(data), headers=headers)
-      #print(moduleID, door_name[str(moduleID)], 'FAULT', r.status_code)
-      log_file('post ' + door_name[str(moduleID)] + ' ' + str(diff_mins) + ' ' + 'FAULT' + ' ' + str(r.status_code))
+def log_msg(msg):
+  log = open('/home/pi/log_mxmeter_doormsg.txt', 'a+')
+  log_msg = strftime('%Y-%m-%d %H:%M:%S', localtime())
+  log_msg += ' log_mxmeter_doormsg ' + msg + '\n'
+  log.write(log_msg)
+  log.close()
 
 def ura_status(door_name):
   url = 'http://137.116.160.215:9080/maximo/oslc/os/mxapiasset?_lid=mxintadm&_lpwd=mxintadm&oslc.select=assetmeter{lastreading}&oslc.where=assetnum=%22'
@@ -120,6 +82,8 @@ def parseDoorSense(rawData, sf):
     
   moduleID = int.from_bytes(data[0:2], byteorder='little', signed=False)
   
+  log_msg('receive ' + str(moduleID))
+  
   if moduleID > 2000 and moduleID < 2017:
     doorStateRaw = int.from_bytes(data[2:4], byteorder='little', signed=False)& 0xFC00
 
@@ -133,7 +97,9 @@ def parseDoorSense(rawData, sf):
     vcc=1074*1024/(int.from_bytes(data[2:4], byteorder='little', signed=False) & 0x3FF)
 
     prev_status =  ura_status(door_name[str(moduleID)])
-  
+    
+    log_msg('receive ' + str(moduleID) + ' ' + door_name[str(moduleID)] + ' ' + doorState)
+    
     if prev_status != doorState:
       url = 'http://137.116.160.215:9080/maxrest/rest/os/MXMETERDATA?_format=json'
       headers = {'Content-type': 'application/json'}
@@ -157,7 +123,7 @@ def parseDoorSense(rawData, sf):
       #print(moduleID, door_name[str(moduleID)], doorState, r.status_code)
       log_file('post ' + door_name[str(moduleID)] + ' ' + doorState + ' ' + str(r.status_code))
       
-      print("Time:" , datetime.datetime.now(), "module: ", moduleID, "State: ", doorState, " RSSI: ", rssi, " SNR: ", snr, " SF: ", sf, " vcc: ", vcc)
+      #print("Time:" , datetime.datetime.now(), "module: ", moduleID, "State: ", doorState, " RSSI: ", rssi, " SNR: ", snr, " SF: ", sf, " vcc: ", vcc)
       
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.bind(("", port))
@@ -166,6 +132,7 @@ s.settimeout(.1)
 
 #print("Port opened at", port)
 log_file('start ' + str(port))
+log_msg('start ' + str(port))
 
 while True:
   #check_fault()
